@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高级音乐播放器</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: rgba(0, 122, 255, 0.95);
+            --secondary-color: rgba(88, 86, 214, 0.95);
+            --accent-color: #ff5e7d;
+            --text-color: #333;
+            --bg-color: rgba(255, 255, 255, 0.92);
+            --glass-border: rgba(255, 255, 255, 0.15);
+            --glass-shadow: 0 15px 50px rgba(31, 38, 135, 0.15);
+            --glass-backdrop: blur(25px) saturate(200%);
+            --card-bg: rgba(255, 255, 255, 0.85);
+            --transition: all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+            --highlight-color: rgba(0, 122, 255, 0.1);
+        }
+
+        .dark-mode {
+            --primary-color: rgba(10, 132, 255, 0.95);
+            --secondary-color: rgba(94, 92, 230, 0.95);
+            --accent-color: #ff5e7d;
+            --text-color: #f5f5f7;
+            --bg-color: rgba(28, 28, 30, 0.92);
+            --glass-border: rgba(0, 0, 0, 0.15);
+            --glass-shadow: 0 15px 50px rgba(0, 0, 0, 0.3);
+            --card-bg: rgba(44, 44, 46, 0.85);
+            --highlight-color: rgba(0, 122, 255, 0.2);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            overflow-x: hidden;
+            transition: var(--transition);
+            position: relative;
+            background: linear-gradient(-45deg, #f5f7fa, #e4e8f0, #d8e1e8, #c9d6df);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            margin: 0 auto;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeIn 0.8s cubic-bezier(0.39, 0.575, 0.565, 1) forwards;
+            animation-delay: 0.3s;
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .glass-panel {
+            background: var(--bg-color);
+            border-radius: 25px;
+            border: 1px solid var(--glass-border);
+            backdrop-filter: var(--glass-backdrop);
+            -webkit-backdrop-filter: var(--glass-backdrop);
+            box-shadow: var(--glass-shadow),
+                        inset 0 1px 2px rgba(255, 255, 255, 0.1);
+            padding: 35px;
+            margin-bottom: 25px;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .glass-panel::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at center, 
+                                        rgba(255, 255, 255, 0.1) 0%, 
+                                        transparent 70%);
+            animation: rotateGradient 20s linear infinite;
+            z-index: -1;
+        }
+
+        @keyframes rotateGradient {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 30px;
+            text-align: center;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            animation: textShine 3s ease-in-out infinite alternate;
+            text-shadow: 0 2px 10px rgba(0, 122, 255, 0.3);
+            letter-spacing: 1px;
+        }
+
+        @keyframes textShine {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 100% 50%; }
+        }
+
+        .search-container {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            animation: fadeIn 0.8s ease-out forwards;
+            animation-delay: 0.7s;
+            opacity: 0;
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 18px 25px;
+            border: none;
+            border-radius: 15px;
+            background: var(--card-bg);
+            color: var(--text-color);
+            font-size: 1.1rem;
+            outline: none;
+            transition: var(--transition);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1),
+                        inset 0 1px 2px rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        input[type="text"]:focus {
+            box-shadow: 0 5px 20px rgba(0, 122, 255, 0.3),
+                        inset 0 1px 2px rgba(255, 255, 255, 0.1);
+            border-color: rgba(0, 122, 255, 0.3);
+        }
+
+        button {
+            padding: 18px 30px;
+            border: none;
+            border-radius: 15px;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2),
+                        inset 0 1px 2px rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        button::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(
+                to bottom right,
+                rgba(255, 255, 255, 0.3) 0%,
+                rgba(255, 255, 255, 0) 60%
+            );
+            transform: rotate(30deg);
+            transition: all 0.5s ease;
+        }
+
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 122, 255, 0.4);
+        }
+
+        button:hover::after {
+            top: -50%;
+            left: -50%;
+        }
+
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 5px 10px rgba(0, 122, 255, 0.3);
+        }
+
+        .quality-selector {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 30px;
+            justify-content: center;
+            animation: fadeIn 0.8s ease-out forwards;
+            animation-delay: 0.9s;
+            opacity: 0;
+        }
+
+        .quality-btn {
+            padding: 12px 20px;
+            border-radius: 12px;
+            background: var(--card-bg);
+            color: var(--text-color);
+            font-size: 1rem;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1),
+                        inset 0 1px 2px rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .quality-btn.active {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            box-shadow: 0 4px 15px rgba(0, 122, 255, 0.3);
+            border-color: transparent;
+        }
+
+        .quality-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 40px 0;
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 5px solid rgba(0, 122, 255, 0.2);
+            border-radius: 50%;
+            border-top-color: var(--primary-color);
+            animation: spin 1.5s linear infinite;
+            margin: 0 auto 15px;
+            box-shadow: 0 0 20px rgba(0, 122, 255, 0.3);
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            color: #ff3b30;
+            text-align: center;
+            margin: 30px 0;
+            display: none;
+            font-size: 1.1rem;
+            font-weight: 500;
+            animation: shake 0.5s ease;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-5px); }
+            40%, 80% { transform: translateX(5px); }
+        }
+
+        .quality-change-notification {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--card-bg);
+            color: var(--text-color);
+            padding: 15px 30px;
+            border-radius: 25px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            backdrop-filter: var(--glass-backdrop);
+            -webkit-backdrop-filter: var(--glass-backdrop);
+            border: 1px solid var(--glass-border);
+        }
+
+        .quality-change-notification.show {
+            opacity: 1;
+        }
+
+        .search-results {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 30px;
+            display: none;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        .search-result-item {
+            padding: 18px;
+            border-radius: 15px;
+            background: var(--card-bg);
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            opacity: 0;
+            transform: translateY(10px);
+            animation: fadeInUpItem 0.5s ease-out forwards;
+        }
+
+        @keyframes fadeInUpItem {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .search-result-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 122, 255, 0.2);
+            background: rgba(0, 122, 255, 0.1);
+        }
+
+        .search-result-cover {
+            width: 60px;
+            height: 60px;
+            border-radius: 10px;
+            object-fit: cover;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .search-result-info {
+            flex: 1;
+        }
+
+        .search-result-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 1.1rem;
+        }
+
+        .search-result-artist {
+            font-size: 0.9rem;
+            opacity: 0.7;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .player-container {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            margin: 40px 0;
+            animation: fadeIn 0.8s ease-out;
+            width: 100%;
+        }
+
+        .song-info {
+            text-align: center;
+            margin-bottom: 35px;
+            width: 100%;
+        }
+
+        .song-title {
+            font-size: 2rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+            text-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .song-artist {
+            font-size: 1.4rem;
+            color: var(--text-color);
+            opacity: 0.8;
+            margin-bottom: 15px;
+        }
+
+        .song-album {
+            font-size: 1.1rem;
+            color: var(--text-color);
+            opacity: 0.6;
+            margin-bottom: 25px;
+        }
+
+        .album-cover {
+            width: 280px;
+            height: 280px;
+            border-radius: 20px;
+            object-fit: cover;
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
+            margin-bottom: 35px;
+            transition: var(--transition);
+            animation: float 6s ease-in-out infinite;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+
+        .progress-container {
+            width: 100%;
+            height: 8px;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 4px;
+            margin: 30px 0;
+            cursor: pointer;
+            overflow: hidden;
+            position: relative;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+
+        .progress-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(
+                to right,
+                transparent,
+                rgba(255, 255, 255, 0.1),
+                transparent
+            );
+            animation: progressShine 3s linear infinite;
+            opacity: 0.5;
+        }
+
+        @keyframes progressShine {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            border-radius: 4px;
+            width: 0%;
+            transition: width 0.1s linear;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(
+                to right,
+                rgba(255, 255, 255, 0.3),
+                rgba(255, 255, 255, 0)
+            );
+            animation: progressShine 2s linear infinite;
+        }
+
+        .time-info {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            font-size: 0.9rem;
+            color: var(--text-color);
+            opacity: 0.7;
+            margin-bottom: 30px;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .control-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--card-bg);
+            color: var(--text-color);
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2),
+                        inset 0 1px 2px rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .control-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(
+                circle at center,
+                rgba(255, 255, 255, 0.1) 0%,
+                transparent 70%
+            );
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .control-btn:hover {
+            transform: translateY(-5px) scale(1.05);
+            box-shadow: 0 12px 25px rgba(0, 122, 255, 0.3);
+        }
+
+        .control-btn:hover::before {
+            opacity: 1;
+        }
+
+        .control-btn:active {
+            transform: translateY(0) scale(0.98);
+            box-shadow: 0 5px 15px rgba(0, 122, 255, 0.2);
+        }
+
+        .control-btn.play-pause {
+            width: 90px;
+            height: 90px;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            box-shadow: 0 10px 25px rgba(0, 122, 255, 0.4);
+        }
+
+        .control-btn i {
+            font-size: 1.6rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .play-pause i {
+            font-size: 2.2rem;
+        }
+
+        .song-quality {
+            font-size: 0.9rem;
+            color: var(--text-color);
+            opacity: 0.7;
+            margin-bottom: 5px;
+        }
+
+        .song-size {
+            font-size: 0.9rem;
+            color: var(--text-color);
+            opacity: 0.7;
+            margin-bottom: 25px;
+        }
+
+        .song-url-container {
+            width: 100%;
+            margin: 30px 0;
+            position: relative;
+        }
+
+        .song-url-label {
+            font-size: 0.9rem;
+            color: var(--text-color);
+            opacity: 0.7;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .song-url-input {
+            width: 100%;
+            padding: 15px;
+            padding-right: 45px;
+            border-radius: 12px;
+            background: var(--card-bg);
+            border: none;
+            color: var(--text-color);
+            font-size: 0.9rem;
+            outline: none;
+            transition: var(--transition);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .song-url-input:focus {
+            box-shadow: 0 4px 12px rgba(0, 122, 255, 0.2);
+        }
+
+        .copy-url-btn {
+            position: absolute;
+            right: 10px;
+            top: 38px;
+            background: none;
+            border: none;
+            color: var(--text-color);
+            opacity: 0.7;
+            cursor: pointer;
+            transition: var(--transition);
+            padding: 5px;
+        }
+
+        .copy-url-btn:hover {
+            opacity: 1;
+            color: var(--primary-color);
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--card-bg);
+            color: var(--text-color);
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+            border: none;
+            z-index: 100;
+        }
+
+        .feedback-toggle {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--card-bg);
+            color: var(--text-color);
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+            border: none;
+            z-index: 100;
+        }
+
+        .theme-toggle:hover, .feedback-toggle:hover {
+            transform: scale(1.1);
+        }
+
+        .feedback-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .feedback-modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .feedback-content {
+            background: var(--bg-color);
+            border-radius: 30px;
+            padding: 40px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: var(--glass-shadow);
+            backdrop-filter: var(--glass-backdrop);
+            -webkit-backdrop-filter: var(--glass-backdrop);
+            border: 1px solid var(--glass-border);
+            position: relative;
+            transform: scale(0.9);
+            transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+            opacity: 0;
+        }
+
+        .feedback-modal.active .feedback-content {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        .close-feedback {
+            position: absolute;
+            top: 25px;
+            right: 25px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--card-bg);
+            color: var(--text-color);
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            border: none;
+        }
+
+        .close-feedback:hover {
+            transform: rotate(90deg);
+            color: var(--accent-color);
+        }
+
+        .feedback-iframe {
+            width: 100%;
+            height: 500px;
+            border: none;
+            border-radius: 20px;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2.5rem;
+            }
+            
+            .glass-panel {
+                padding: 25px;
+            }
+            
+            .search-container {
+                flex-direction: column;
+            }
+            
+            .album-cover {
+                width: 220px;
+                height: 220px;
+            }
+            
+            .controls {
+                gap: 20px;
+            }
+            
+            .control-btn {
+                width: 60px;
+                height: 60px;
+            }
+            
+            .control-btn.play-pause {
+                width: 80px;
+                height: 80px;
+            }
+            
+            .theme-toggle, .feedback-toggle {
+                width: 50px;
+                height: 50px;
+                top: 20px;
+                right: 20px;
+            }
+            
+            .feedback-toggle {
+                top: 80px;
+            }
+            
+            .feedback-content {
+                padding: 25px;
+            }
+            
+            .feedback-iframe {
+                height: 400px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 1.8rem;
+            }
+            
+            .glass-panel {
+                padding: 20px;
+            }
+            
+            input[type="text"] {
+                padding: 15px 20px;
+                font-size: 1rem;
+            }
+            
+            button {
+                padding: 15px 25px;
+                font-size: 1rem;
+            }
+            
+            .quality-btn {
+                padding: 10px 15px;
+                font-size: 0.9rem;
+            }
+            
+            .album-cover {
+                width: 200px;
+                height: 200px;
+            }
+            
+            .song-title {
+                font-size: 1.6rem;
+            }
+            
+            .song-artist {
+                font-size: 1.2rem;
+            }
+            
+            .controls {
+                gap: 15px;
+            }
+            
+            .control-btn {
+                width: 55px;
+                height: 55px;
+            }
+            
+            .control-btn.play-pause {
+                width: 70px;
+                height: 70px;
+            }
+            
+            .feedback-iframe {
+                height: 350px;
+            }
+        }
+
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 122, 255, 0.4);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 122, 255, 0.6);
+        }
+    </style>
+</head>
+<body>
+    <div class="quality-change-notification" id="qualityNotification"></div>
+
+    <button class="theme-toggle" id="themeToggle">
+        <i class="fas fa-moon"></i>
+    </button>
+
+    <button class="feedback-toggle" id="feedbackToggle">
+        <i class="fas fa-comment-dots"></i>
+    </button>
+
+    <div class="feedback-modal" id="feedbackModal">
+        <div class="feedback-content">
+            <button class="close-feedback" id="closeFeedback">
+                <i class="fas fa-times"></i>
+            </button>
+            <h2 style="text-align: center; margin-bottom: 20px; font-size: 1.8rem; color: var(--text-color);">问题反馈</h2>
+            <iframe class="feedback-iframe" src="https://wj.qq.com/s2/23702452/1242/" frameborder="0"></iframe>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="glass-panel">
+            <h1>高级音乐播放器</h1>
+            
+            <div class="search-container">
+                <input type="text" id="searchInput" placeholder="搜索歌曲..." autocomplete="off">
+                <button id="searchBtn"><i class="fas fa-search"></i> 搜索</button>
+            </div>
+            
+            <div class="quality-selector">
+                <div class="quality-btn" data-quality="2">标准 (128k)</div>
+                <div class="quality-btn" data-quality="3">高品质 (192k)</div>
+                <div class="quality-btn" data-quality="4">极高 (320k)</div>
+                <div class="quality-btn active" data-quality="5">无损</div>
+                <div class="quality-btn" data-quality="9">母带</div>
+            </div>
+            
+            <div class="loading" id="loading">
+                <div class="loading-spinner"></div>
+                <p>加载中...</p>
+            </div>
+            
+            <div class="error-message" id="errorMessage"></div>
+            
+            <div class="search-results" id="searchResults"></div>
+            
+            <div class="player-container" id="playerContainer">
+                <div class="song-info">
+                    <img src="" alt="专辑封面" class="album-cover" id="albumCover">
+                    <h2 class="song-title" id="songTitle"></h2>
+                    <p class="song-artist" id="songArtist"></p>
+                    <p class="song-album" id="songAlbum"></p>
+                    <p class="song-quality" id="songQuality"></p>
+                    <p class="song-size" id="songSize"></p>
+                </div>
+                
+                <div class="progress-container" id="progressContainer">
+                    <div class="progress-bar" id="progressBar"></div>
+                </div>
+                
+                <div class="time-info">
+                    <span id="currentTime">0:00</span>
+                    <span id="duration">0:00</span>
+                </div>
+                
+                <div class="controls">
+                    <button class="control-btn" id="prevBtn"><i class="fas fa-step-backward"></i></button>
+                    <button class="control-btn play-pause" id="playPauseBtn"><i class="fas fa-play"></i></button>
+                    <button class="control-btn" id="nextBtn"><i class="fas fa-step-forward"></i></button>
+                </div>
+                
+                <div class="song-url-container">
+                    <label class="song-url-label">音乐播放地址:</label>
+                    <input type="text" id="songUrlInput" class="song-url-input" readonly>
+                    <button class="copy-url-btn" id="copyUrlBtn">
+                        <i class="fas fa-copy"></i> 复制到浏览器下载
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <audio id="audioPlayer"></audio>
+
+    <script>
+        // DOM元素
+        const themeToggle = document.getElementById('themeToggle');
+        const feedbackToggle = document.getElementById('feedbackToggle');
+        const feedbackModal = document.getElementById('feedbackModal');
+        const closeFeedback = document.getElementById('closeFeedback');
+        const searchInput = document.getElementById('searchInput');
+        const searchBtn = document.getElementById('searchBtn');
+        const qualityBtns = document.querySelectorAll('.quality-btn');
+        const loading = document.getElementById('loading');
+        const errorMessage = document.getElementById('errorMessage');
+        const searchResults = document.getElementById('searchResults');
+        const playerContainer = document.getElementById('playerContainer');
+        const albumCover = document.getElementById('albumCover');
+        const songTitle = document.getElementById('songTitle');
+        const songArtist = document.getElementById('songArtist');
+        const songAlbum = document.getElementById('songAlbum');
+        const songQuality = document.getElementById('songQuality');
+        const songSize = document.getElementById('songSize');
+        const songUrlInput = document.getElementById('songUrlInput');
+        const copyUrlBtn = document.getElementById('copyUrlBtn');
+        const progressContainer = document.getElementById('progressConta
